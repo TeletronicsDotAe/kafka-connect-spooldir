@@ -272,3 +272,4 @@ mvn clean package
 export SUSPEND='y'
 ./bin/debug.sh
 ```
+[![Latest Build Status](https://travis-ci.org/TeletronicsDotAe/kafka-connect-spooldir.svg?branch=master)](https://travis-ci.org/TeletronicsDotAe/kafka-connect-spooldir)
