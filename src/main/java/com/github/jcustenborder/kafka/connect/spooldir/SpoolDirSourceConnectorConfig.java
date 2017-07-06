@@ -26,6 +26,7 @@ import com.google.common.io.PatternFilenameFilter;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Type;
+import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Timestamp;
@@ -269,6 +270,8 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     this.inputFilenameFilter = new PatternFilenameFilter(inputPattern);
   }
 
+
+
   private static final Field findMetadataField(Schema schema) {
     Field result = null;
     for (Field field : schema.fields()) {
@@ -340,6 +343,12 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
 
     @Override
     public void ensureValid(final String key, Object value) {
+      if (value == null) {
+        throw new ConfigException(
+                String.format("Directory '%s' needs to be defined ", key)
+        );
+      }
+
       String valueString = (String) value;
       File directoryPath = new File(valueString);
 
@@ -356,7 +365,7 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
       );
 
       if (!directoryPath.isDirectory()) {
-        throw new ConnectException(
+        throw new ConfigException(
             errorMessage,
             new FileNotFoundException(directoryPath.getAbsolutePath())
         );
@@ -376,7 +385,7 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
       try {
         temporaryFile = File.createTempFile(".permission", ".testing", directoryPath);
       } catch (IOException ex) {
-        throw new ConnectException(
+        throw new ConfigException(
             errorMessage,
             ex
         );
