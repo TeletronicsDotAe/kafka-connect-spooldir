@@ -173,13 +173,13 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     if (!this.schemaGenerationEnabled) {
       Preconditions.checkNotNull(
           this.keySchema,
-          "'%s' must be set if '%s' = true.",
+          "'%s' must be set if '%s' = false.",
           KEY_SCHEMA_CONF,
           SCHEMA_GENERATION_ENABLED_CONF
       );
       Preconditions.checkNotNull(
           this.valueSchema,
-          "'%s' must be set if '%s' = true.",
+          "'%s' must be set if '%s' = false.",
           VALUE_SCHEMA_CONF,
           SCHEMA_GENERATION_ENABLED_CONF
       );
