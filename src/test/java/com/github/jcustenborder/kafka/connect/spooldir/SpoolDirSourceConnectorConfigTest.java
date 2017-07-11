@@ -35,6 +35,7 @@ public abstract class SpoolDirSourceConnectorConfigTest {
         settings.put(SpoolDirSourceConnectorConfig.ERROR_PATH_CONFIG, errorPath.getAbsolutePath());
         settings.put(SpoolDirSourceConnectorConfig.TOPIC_CONF, "dummy-topic");
         settings.put(SpoolDirSourceConnectorConfig.INPUT_FILE_PATTERN_CONF, "dummy-pattern");
+        settings.put(SpoolDirSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, "true");
     }
 
     @Test
@@ -73,7 +74,7 @@ public abstract class SpoolDirSourceConnectorConfigTest {
                 map(configValue -> configValue.name()).
                 collect(Collectors.toSet());
         Set<String> expectedConfigValuesWithErrors = new HashSet(Arrays.asList(
-                "input.file.pattern", "finished.path", "topic", "error.path", "input.path"));
+                "input.file.pattern", "finished.path", "topic", "error.path", "input.path", "key.schema", "value.schema"));
         assertEquals(expectedConfigValuesWithErrors, configValuesWithErrors);
     }
 
@@ -85,7 +86,7 @@ public abstract class SpoolDirSourceConnectorConfigTest {
                 filter(configValue -> !configValue.errorMessages().isEmpty()).
                 map(configValue -> configValue.name()).
                 collect(Collectors.toSet());
-        Set<String> expectedConfigValuesWithErrors = new HashSet(Arrays.asList());
+        Set<String> expectedConfigValuesWithErrors = Collections.emptySet();
         assertEquals(expectedConfigValuesWithErrors, configValuesWithErrors);
         //Settings was validated -> possible to create connector based on settings.
         connector.config(settings);
