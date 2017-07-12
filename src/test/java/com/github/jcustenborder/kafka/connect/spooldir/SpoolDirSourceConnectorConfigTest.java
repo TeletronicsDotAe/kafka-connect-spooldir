@@ -14,19 +14,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public abstract class SpoolDirSourceConnectorConfigTest {
   protected Map<String, String> settings;
-  File tempRoot;
-  File inputPath;
-  File finishedPath;
-  File errorPath;
 
   @BeforeEach
   public void createTempDir() {
-    tempRoot = Files.createTempDir();
-    inputPath = new File(tempRoot, "input");
+    File tempRoot = Files.createTempDir();
+    File inputPath = new File(tempRoot, "input");
     inputPath.mkdirs();
-    finishedPath = new File(tempRoot, "finished");
+    File finishedPath = new File(tempRoot, "finished");
     finishedPath.mkdirs();
-    errorPath = new File(tempRoot, "error");
+    File errorPath = new File(tempRoot, "error");
     errorPath.mkdirs();
 
     settings = new LinkedHashMap<>();
@@ -71,9 +67,9 @@ public abstract class SpoolDirSourceConnectorConfigTest {
     Config config = connector.validate(settings);
     Set<String> configValuesWithErrors = config.configValues().stream().
         filter(configValue -> !configValue.errorMessages().isEmpty()).
-        map(configValue -> configValue.name()).
+        map(ConfigValue::name).
         collect(Collectors.toSet());
-    Set<String> expectedConfigValuesWithErrors = new HashSet(Arrays.asList(
+    Set<String> expectedConfigValuesWithErrors = new HashSet<>(Arrays.asList(
         "input.file.pattern", "finished.path", "topic", "error.path", "input.path", "key.schema", "value.schema"));
     assertEquals(expectedConfigValuesWithErrors, configValuesWithErrors);
   }
@@ -84,7 +80,7 @@ public abstract class SpoolDirSourceConnectorConfigTest {
     Config config = connector.validate(settings);
     Set<String> configValuesWithErrors = config.configValues().stream().
         filter(configValue -> !configValue.errorMessages().isEmpty()).
-        map(configValue -> configValue.name()).
+        map(ConfigValue::name).
         collect(Collectors.toSet());
     Set<String> expectedConfigValuesWithErrors = Collections.emptySet();
     assertEquals(expectedConfigValuesWithErrors, configValuesWithErrors);
