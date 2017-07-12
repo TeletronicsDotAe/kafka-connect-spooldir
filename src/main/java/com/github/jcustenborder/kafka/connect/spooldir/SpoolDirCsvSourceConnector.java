@@ -49,16 +49,16 @@ public class SpoolDirCsvSourceConnector extends SpoolDirSourceConnector<SpoolDir
   public Config validate(Map<String, String> connectorConfigs) {
     ConfigValidationRules rules = new ConfigValidationRules(super.validate(connectorConfigs));
     ConfigValidationRules.Rule<String> nonEmptyString =
-            new ConfigValidationRules.Rule<>(String.class, s -> !s.isEmpty(), "must be non-empty");
+        new ConfigValidationRules.Rule<>(String.class, s -> !s.isEmpty(), "must be non-empty");
 
     rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, false).
-            validate(SpoolDirCsvSourceConnectorConfig.KEY_SCHEMA_CONF, nonEmptyString).
-            validate(SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF, nonEmptyString);
+        validate(SpoolDirCsvSourceConnectorConfig.KEY_SCHEMA_CONF, nonEmptyString).
+        validate(SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF, nonEmptyString);
     rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, true).
-            validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_KEY_NAME_CONF, nonEmptyString).
-            validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_VALUE_NAME_CONF, nonEmptyString);
+        validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_KEY_NAME_CONF, nonEmptyString).
+        validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_VALUE_NAME_CONF, nonEmptyString);
     rules.when(SpoolDirCsvSourceConnectorConfig.TIMESTAMP_MODE_CONF, SpoolDirSourceConnectorConfig.TimestampMode.FIELD.toString()).
-            validate(SpoolDirCsvSourceConnectorConfig.TIMESTAMP_FIELD_CONF, nonEmptyString);
+        validate(SpoolDirCsvSourceConnectorConfig.TIMESTAMP_FIELD_CONF, nonEmptyString);
 
     return rules.getConfig();
   }
