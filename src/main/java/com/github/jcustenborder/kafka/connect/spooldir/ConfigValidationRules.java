@@ -21,6 +21,10 @@ import org.apache.kafka.common.config.ConfigValue;
 import java.util.Optional;
 import java.util.function.Predicate;
 
+/**
+ * Used to specify validation dependencies between configuration parameters, i. e.
+ * "When app.id is 123, validate that app.foo is a non-empty string and that app.bar is between 1 and 100"
+ */
 class ConfigValidationRules {
   private Config config;
 
@@ -45,7 +49,7 @@ class ConfigValidationRules {
   }
 
   private <T> boolean match(String name, Rule<T> rule) {
-    return findValue(name).map(ConfigValue::value).map(v -> rule.type.cast(v)).filter(rule.predicate).isPresent();
+    return findValue(name).map(ConfigValue::value).map(v -> rule.inputType.cast(v)).filter(rule.predicate).isPresent();
   }
 
   private Optional<ConfigValue> findValue(String name) {
@@ -66,12 +70,12 @@ class ConfigValidationRules {
   }
 
   static class Rule<T> {
-    private Class<T> type;
+    private Class<T> inputType;
     private Predicate<T> predicate;
     private String description;
 
-    Rule(Class<T> type, Predicate<T> predicate, String description) {
-      this.type = type;
+    Rule(Class<T> inputType, Predicate<T> predicate, String description) {
+      this.inputType = inputType;
       this.predicate = predicate;
       this.description = description;
     }
@@ -87,7 +91,7 @@ class ConfigValidationRules {
     <T> When<S> validate(String name, Rule<T> rule) {
       if (!description.isEmpty()) {
         ConfigValidationRules.this.validate(name, new Rule<>(
-            rule.type,
+            rule.inputType,
             rule.predicate,
             String.format("%s%s", rule.description, description))
         );

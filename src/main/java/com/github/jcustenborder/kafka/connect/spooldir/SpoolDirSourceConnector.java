@@ -136,8 +136,11 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
 
   @Override
   public Config validate(Map<String, String> connectorConfigs) {
-    ConfigValidationRules.Rule<String> nonEmptyString =
-        new ConfigValidationRules.Rule<>(String.class, s -> !s.isEmpty(), "must be non-empty");
+    ConfigValidationRules rules = new ConfigValidationRules(super.validate(connectorConfigs));
+
+    ConfigValidationRules.Rule<String> nonEmptyString = new ConfigValidationRules.Rule<>(String.class,
+        s -> !s.isEmpty(), "must be non-empty");
+
     ConfigValidationRules.Rule<String> validSchema = new ConfigValidationRules.Rule<>(String.class, s -> {
       try {
         ObjectMapperFactory.INSTANCE.readValue(s, Schema.class);
@@ -148,7 +151,6 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
       return false;
     }, "must be valid Schema");
 
-    ConfigValidationRules rules = new ConfigValidationRules(super.validate(connectorConfigs));
     rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, false).
         validate(SpoolDirCsvSourceConnectorConfig.KEY_SCHEMA_CONF, validSchema).
         validate(SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF, validSchema);
