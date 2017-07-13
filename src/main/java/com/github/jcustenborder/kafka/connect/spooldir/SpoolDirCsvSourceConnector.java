@@ -16,9 +16,11 @@
 package com.github.jcustenborder.kafka.connect.spooldir;
 
 import com.github.jcustenborder.kafka.connect.utils.config.Description;
+import com.github.jcustenborder.kafka.connect.utils.jackson.ObjectMapperFactory;
 import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.Task;
+import org.apache.kafka.connect.data.Schema;
 
 import java.util.Map;
 
@@ -47,13 +49,22 @@ public class SpoolDirCsvSourceConnector extends SpoolDirSourceConnector<SpoolDir
 
   @Override
   public Config validate(Map<String, String> connectorConfigs) {
-    ConfigValidationRules rules = new ConfigValidationRules(super.validate(connectorConfigs));
     ConfigValidationRules.Rule<String> nonEmptyString =
         new ConfigValidationRules.Rule<>(String.class, s -> !s.isEmpty(), "must be non-empty");
+    ConfigValidationRules.Rule<String> validSchema = new ConfigValidationRules.Rule<>(String.class, s -> {
+          try {
+            ObjectMapperFactory.INSTANCE.readValue(s, Schema.class);
+            return true;
+          } catch (Exception e) {
+            // Do nothing
+          }
+          return false;
+        }, "must be valid Schema");
 
+    ConfigValidationRules rules = new ConfigValidationRules(super.validate(connectorConfigs));
     rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, false).
-        validate(SpoolDirCsvSourceConnectorConfig.KEY_SCHEMA_CONF, nonEmptyString).
-        validate(SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF, nonEmptyString);
+        validate(SpoolDirCsvSourceConnectorConfig.KEY_SCHEMA_CONF, validSchema).
+        validate(SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF, validSchema);
     rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, true).
         validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_KEY_NAME_CONF, nonEmptyString).
         validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_VALUE_NAME_CONF, nonEmptyString);
