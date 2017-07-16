@@ -34,7 +34,7 @@ class ConfigValidationRules {
 
   <T> When<T> when(String name, T value) {
     @SuppressWarnings("unchecked") Class<T> type = (Class<T>) value.getClass();
-    return when(name, new Rule<>(type, v -> v.equals(value), "is " + value));
+    return when(name, new Rule<>(type, "is " + value, v -> v.equals(value)));
   }
 
   <T> When<T> when(String name, Rule<T> rule) {
@@ -49,7 +49,11 @@ class ConfigValidationRules {
   }
 
   private <T> boolean match(String name, Rule<T> rule) {
-    return findValue(name).map(ConfigValue::value).map(v -> rule.inputType.cast(v)).filter(rule.predicate).isPresent();
+    return findValue(rule.inputType, name).filter(rule.predicate).isPresent();
+  }
+
+  <T> Optional<T> findValue(Class<T> type, String name) {
+    return findValue(name).map(ConfigValue::value).map(type::cast);
   }
 
   private Optional<ConfigValue> findValue(String name) {
@@ -71,13 +75,13 @@ class ConfigValidationRules {
 
   static class Rule<T> {
     private Class<T> inputType;
-    private Predicate<T> predicate;
     private String description;
+    private Predicate<T> predicate;
 
-    Rule(Class<T> inputType, Predicate<T> predicate, String description) {
+    Rule(Class<T> inputType, String description, Predicate<T> predicate) {
       this.inputType = inputType;
-      this.predicate = predicate;
       this.description = description;
+      this.predicate = predicate;
     }
   }
 
@@ -92,9 +96,9 @@ class ConfigValidationRules {
       if (!description.isEmpty()) {
         ConfigValidationRules.this.validate(name, new Rule<>(
             rule.inputType,
-            rule.predicate,
-            String.format("%s%s", rule.description, description))
-        );
+            String.format("%s%s", rule.description, description),
+            rule.predicate
+        ));
       }
       return this;
     }

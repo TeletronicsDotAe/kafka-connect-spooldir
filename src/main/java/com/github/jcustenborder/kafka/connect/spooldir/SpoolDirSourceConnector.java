@@ -1,12 +1,12 @@
 /**
  * Copyright © 2016 Jeremy Custenborder (jcustenborder@gmail.com)
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,13 +15,16 @@
  */
 package com.github.jcustenborder.kafka.connect.spooldir;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.jcustenborder.kafka.connect.utils.VersionUtil;
 import com.github.jcustenborder.kafka.connect.utils.jackson.ObjectMapperFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import org.apache.kafka.common.config.Config;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.source.SourceConnector;
@@ -30,12 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnectorConfig> extends SourceConnector {
@@ -139,27 +137,43 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
     ConfigValidationRules rules = new ConfigValidationRules(super.validate(connectorConfigs));
 
     ConfigValidationRules.Rule<String> nonEmptyString = new ConfigValidationRules.Rule<>(String.class,
-        s -> !s.isEmpty(), "must be non-empty");
+        "must be non-empty", s -> !s.isEmpty());
 
-    ConfigValidationRules.Rule<String> validSchema = new ConfigValidationRules.Rule<>(String.class, s -> {
-      try {
-        ObjectMapperFactory.INSTANCE.readValue(s, Schema.class);
-        return true;
-      } catch (Exception e) {
-        // Do nothing
-      }
-      return false;
-    }, "must be valid Schema");
+    ConfigValidationRules.Rule<String> validSchema = new ConfigValidationRules.Rule<>(String.class,
+        "must be valid schema", s -> toSchema(s).isPresent());
 
     rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, false).
         validate(SpoolDirCsvSourceConnectorConfig.KEY_SCHEMA_CONF, validSchema).
         validate(SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF, validSchema);
+
     rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, true).
         validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_KEY_NAME_CONF, nonEmptyString).
         validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_VALUE_NAME_CONF, nonEmptyString);
+
     rules.when(SpoolDirCsvSourceConnectorConfig.TIMESTAMP_MODE_CONF, SpoolDirSourceConnectorConfig.TimestampMode.FIELD.toString()).
-        validate(SpoolDirCsvSourceConnectorConfig.TIMESTAMP_FIELD_CONF, nonEmptyString);
+        validate(SpoolDirCsvSourceConnectorConfig.TIMESTAMP_FIELD_CONF, new ConfigValidationRules.Rule<>(String.class,
+            String.format("must be present in value.schema, cannot be optional, and must be in the correct format (i.e. %s)", timestampExample()),
+            s -> rules.findValue(String.class, SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF).
+                flatMap(this::toSchema).flatMap(schema -> Optional.ofNullable(schema.field(s))).map(Field::schema).
+                map(schema -> !schema.isOptional() && Timestamp.LOGICAL_NAME.equals(schema.name())).orElse(false)
+        ));
 
     return rules.getConfig();
+  }
+
+  private Optional<Schema> toSchema(String s) {
+    try {
+      return Optional.of(ObjectMapperFactory.INSTANCE.readValue(s, Schema.class));
+    } catch (Exception e) {
+      return Optional.empty();
+    }
+  }
+
+  private String timestampExample() {
+    try {
+      return ObjectMapperFactory.INSTANCE.writeValueAsString(Timestamp.SCHEMA);
+    } catch (JsonProcessingException e) {
+      throw new ConnectException("Exception thrown while generating timestamp schema example", e);
+    }
   }
 }

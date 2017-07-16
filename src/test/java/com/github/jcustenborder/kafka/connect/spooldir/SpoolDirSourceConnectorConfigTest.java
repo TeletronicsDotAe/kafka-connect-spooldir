@@ -10,6 +10,7 @@ import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.TIMESTAMP_MODE_CONF;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public abstract class SpoolDirSourceConnectorConfigTest {
@@ -77,6 +78,21 @@ public abstract class SpoolDirSourceConnectorConfigTest {
   @Test
   public void minimalValidConfig() {
     SpoolDirSourceConnector connector = createConnector();
+    Config config = connector.validate(settings);
+    Set<String> configValuesWithErrors = config.configValues().stream().
+        filter(configValue -> !configValue.errorMessages().isEmpty()).
+        map(ConfigValue::name).
+        collect(Collectors.toSet());
+    Set<String> expectedConfigValuesWithErrors = Collections.emptySet();
+    assertEquals(expectedConfigValuesWithErrors, configValuesWithErrors);
+    //Settings was validated -> possible to create connector based on settings.
+    connector.config(settings);
+  }
+
+  @Test
+  public void timeStampTest() {
+    SpoolDirSourceConnector connector = createConnector();
+    settings.put(TIMESTAMP_MODE_CONF, SpoolDirSourceConnectorConfig.TimestampMode.FIELD.toString());
     Config config = connector.validate(settings);
     Set<String> configValuesWithErrors = config.configValues().stream().
         filter(configValue -> !configValue.errorMessages().isEmpty()).
