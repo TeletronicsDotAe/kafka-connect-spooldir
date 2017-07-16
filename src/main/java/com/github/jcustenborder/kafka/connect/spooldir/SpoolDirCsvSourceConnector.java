@@ -26,6 +26,7 @@ import java.util.Map;
 public class SpoolDirCsvSourceConnector extends SpoolDirSourceConnector<SpoolDirCsvSourceConnectorConfig> {
   @Override
   protected SpoolDirCsvSourceConnectorConfig config(Map<String, String> settings) {
+    failOnValidationErrors(settings);
     return new SpoolDirCsvSourceConnectorConfig(false, settings);
   }
 

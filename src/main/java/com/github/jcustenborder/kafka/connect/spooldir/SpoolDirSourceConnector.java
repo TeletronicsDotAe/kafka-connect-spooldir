@@ -33,14 +33,25 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.KEY_SCHEMA_CONF;
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.PARSER_TIMESTAMP_DATE_FORMATS_CONF;
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF;
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.SCHEMA_GENERATION_KEY_NAME_CONF;
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.SCHEMA_GENERATION_VALUE_NAME_CONF;
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.TIMESTAMP_FIELD_CONF;
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.TIMESTAMP_MODE_CONF;
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.VALUE_SCHEMA_CONF;
 
 public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnectorConfig> extends SourceConnector {
   private static Logger log = LoggerFactory.getLogger(SpoolDirSourceConnector.class);
@@ -114,11 +125,11 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
         }
 
         final String keySchema = ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getKey());
-        log.info("Setting {} to {}", SpoolDirSourceConnectorConfig.KEY_SCHEMA_CONF, keySchema);
+        log.info("Setting {} to {}", KEY_SCHEMA_CONF, keySchema);
         final String valueSchema = ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getValue());
-        log.info("Setting {} to {}", SpoolDirSourceConnectorConfig.VALUE_SCHEMA_CONF, valueSchema);
-        settings.put(SpoolDirSourceConnectorConfig.KEY_SCHEMA_CONF, keySchema);
-        settings.put(SpoolDirSourceConnectorConfig.VALUE_SCHEMA_CONF, valueSchema);
+        log.info("Setting {} to {}", VALUE_SCHEMA_CONF, valueSchema);
+        settings.put(KEY_SCHEMA_CONF, keySchema);
+        settings.put(VALUE_SCHEMA_CONF, valueSchema);
       } catch (IOException e) {
         throw new ConnectException("Exception thrown while generating schema", e);
       }
@@ -130,12 +141,19 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
 
   @Override
   public List<Map<String, String>> taskConfigs(int i) {
-    return Arrays.asList(this.settings);
+    return Collections.singletonList(this.settings);
   }
 
   @Override
   public void stop() {
 
+  }
+
+  public void failOnValidationErrors(Map<String, String> connectorConfigs) {
+    validate(connectorConfigs).configValues().stream().filter(cv -> !cv.errorMessages().isEmpty()).
+        findFirst().map(cv -> {
+      throw new ConnectException(cv.errorMessages().get(0));
+    });
   }
 
   @Override
@@ -148,18 +166,29 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
     ConfigValidationRules.Rule<String> validSchema = new ConfigValidationRules.Rule<>(String.class,
         "must be valid schema", s -> toSchema(s).isPresent());
 
-    rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, false).
-        validate(SpoolDirCsvSourceConnectorConfig.KEY_SCHEMA_CONF, validSchema).
-        validate(SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF, validSchema);
+    rules.validate(PARSER_TIMESTAMP_DATE_FORMATS_CONF, new ConfigValidationRules.Rule<>(List.class,
+        "must be valid list of Date formats", dateFormats -> {
+      try {
+        //noinspection unchecked
+        ((List<String>) dateFormats).forEach(SimpleDateFormat::new);
+        return true;
+      } catch (Exception e) {
+        return false;
+      }
+    }));
 
-    rules.when(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_ENABLED_CONF, true).
-        validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_KEY_NAME_CONF, nonEmptyString).
-        validate(SpoolDirCsvSourceConnectorConfig.SCHEMA_GENERATION_VALUE_NAME_CONF, nonEmptyString);
+    rules.when(SCHEMA_GENERATION_ENABLED_CONF, false).
+        validate(KEY_SCHEMA_CONF, validSchema).
+        validate(VALUE_SCHEMA_CONF, validSchema);
 
-    rules.when(SpoolDirCsvSourceConnectorConfig.TIMESTAMP_MODE_CONF, SpoolDirSourceConnectorConfig.TimestampMode.FIELD.toString()).
-        validate(SpoolDirCsvSourceConnectorConfig.TIMESTAMP_FIELD_CONF, new ConfigValidationRules.Rule<>(String.class,
+    rules.when(SCHEMA_GENERATION_ENABLED_CONF, true).
+        validate(SCHEMA_GENERATION_KEY_NAME_CONF, nonEmptyString).
+        validate(SCHEMA_GENERATION_VALUE_NAME_CONF, nonEmptyString);
+
+    rules.when(TIMESTAMP_MODE_CONF, SpoolDirSourceConnectorConfig.TimestampMode.FIELD.toString()).
+        validate(TIMESTAMP_FIELD_CONF, new ConfigValidationRules.Rule<>(String.class,
             String.format("must be present in value.schema, cannot be optional, and must be in the correct format (i.e. %s)", timestampExample()),
-            s -> rules.findValue(String.class, SpoolDirCsvSourceConnectorConfig.VALUE_SCHEMA_CONF).
+            s -> rules.findValue(String.class, VALUE_SCHEMA_CONF).
                 flatMap(this::toSchema).flatMap(schema -> Optional.ofNullable(schema.field(s))).map(Field::schema).
                 map(schema -> !schema.isOptional() && Timestamp.LOGICAL_NAME.equals(schema.name())).orElse(false)
         ));

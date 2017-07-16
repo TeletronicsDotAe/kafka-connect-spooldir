@@ -170,34 +170,6 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     this.keySchema = readSchema(KEY_SCHEMA_CONF);
     this.valueSchema = readSchema(VALUE_SCHEMA_CONF);
 
-    if (!this.schemaGenerationEnabled) {
-      Preconditions.checkNotNull(
-          this.keySchema,
-          "'%s' must be set if '%s' = false.",
-          KEY_SCHEMA_CONF,
-          SCHEMA_GENERATION_ENABLED_CONF
-      );
-      Preconditions.checkNotNull(
-          this.valueSchema,
-          "'%s' must be set if '%s' = false.",
-          VALUE_SCHEMA_CONF,
-          SCHEMA_GENERATION_ENABLED_CONF
-      );
-    } else {
-      Preconditions.checkState(
-          !Strings.isNullOrEmpty(this.schemaGenerationKeyName),
-          "'%s' must be set if '%s' = true.",
-          SCHEMA_GENERATION_KEY_NAME_CONF,
-          SCHEMA_GENERATION_ENABLED_CONF
-      );
-      Preconditions.checkState(
-          !Strings.isNullOrEmpty(this.schemaGenerationValueName),
-          "'%s' must be set if '%s' = true.",
-          SCHEMA_GENERATION_VALUE_NAME_CONF,
-          SCHEMA_GENERATION_ENABLED_CONF
-      );
-    }
-
     if (null != this.keySchema) {
       this.keyMetadataField = findMetadataField(this.keySchema);
       this.hasKeyMetadataField = null != this.keyMetadataField;
@@ -219,42 +191,7 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     if (TimestampMode.FIELD == this.timestampMode) {
       this.timestampField = this.getString(TIMESTAMP_FIELD_CONF);
 
-      if (Strings.isNullOrEmpty(this.timestampField)) {
-        throw new ConnectException(
-            String.format(
-                "When `%s` is set to `%s`, `%s` must be set to a timestamp field. Cannot be null or empty.",
-                TIMESTAMP_MODE_CONF,
-                TimestampMode.FIELD,
-                TIMESTAMP_FIELD_CONF
-            )
-        );
-      }
-
       log.trace("ctor() - Looking for timestamp field '{}'", this.timestampField);
-      Field timestampField = this.valueSchema.field(this.timestampField);
-
-      if (null == timestampField ||
-          timestampField.schema().isOptional() ||
-          !Timestamp.LOGICAL_NAME.equals(timestampField.schema().name())) {
-
-        String example;
-
-        try {
-          example = ObjectMapperFactory.INSTANCE.writeValueAsString(Timestamp.SCHEMA);
-        } catch (JsonProcessingException e) {
-          example = null;
-        }
-
-        log.trace("ctor() - example: {}", example);
-
-        throw new ConnectException(
-            String.format(
-                "Field '%s' must be present and set to a timestamp and cannot be optional. Example %s",
-                this.timestampField,
-                example
-            )
-        );
-      }
     } else {
       this.timestampField = null;
     }

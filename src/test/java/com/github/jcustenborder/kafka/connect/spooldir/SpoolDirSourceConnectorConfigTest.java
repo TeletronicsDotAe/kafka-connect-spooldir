@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.PARSER_TIMESTAMP_DATE_FORMATS_CONF;
 import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.TIMESTAMP_MODE_CONF;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -99,6 +101,21 @@ public abstract class SpoolDirSourceConnectorConfigTest {
         map(ConfigValue::name).
         collect(Collectors.toSet());
     Set<String> expectedConfigValuesWithErrors = Collections.singleton("timestamp.field");
+    assertEquals(expectedConfigValuesWithErrors, configValuesWithErrors);
+  }
+
+  @Test
+  public void dateFormats() {
+    SpoolDirSourceConnector connector = createConnector();
+    String dateFormats = Stream.of("yyyy-MM-dd'T'HH:mm:ss", "invalid", "yyyy-MM-dd' 'HH:mm:ss").
+        collect(Collectors.joining(","));
+    settings.put(PARSER_TIMESTAMP_DATE_FORMATS_CONF, dateFormats);
+    Config config = connector.validate(settings);
+    Set<String> configValuesWithErrors = config.configValues().stream().
+        filter(configValue -> !configValue.errorMessages().isEmpty()).
+        map(ConfigValue::name).
+        collect(Collectors.toSet());
+    Set<String> expectedConfigValuesWithErrors = Collections.singleton("parser.timestamp.date.formats");
     assertEquals(expectedConfigValuesWithErrors, configValuesWithErrors);
   }
 
