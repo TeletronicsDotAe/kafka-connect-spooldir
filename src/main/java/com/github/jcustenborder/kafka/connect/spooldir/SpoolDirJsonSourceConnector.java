@@ -18,7 +18,6 @@ package com.github.jcustenborder.kafka.connect.spooldir;
 import com.github.jcustenborder.kafka.connect.utils.config.Description;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.Task;
-import org.apache.kafka.connect.errors.ConnectException;
 
 import java.util.Map;
 

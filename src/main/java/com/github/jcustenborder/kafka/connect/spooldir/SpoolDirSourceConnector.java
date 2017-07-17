@@ -149,11 +149,15 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
 
   }
 
+  /**
+   * Throw a ConnectException on the first validation error encountered
+   * @param connectorConfigs settings
+   */
   public void failOnValidationErrors(Map<String, String> connectorConfigs) {
-    validate(connectorConfigs).configValues().stream().filter(cv -> !cv.errorMessages().isEmpty()).
-        findFirst().map(cv -> {
-      throw new ConnectException(cv.errorMessages().get(0));
-    });
+    validate(connectorConfigs).configValues().stream().filter(cv -> !cv.errorMessages().isEmpty()).findFirst().map(
+        cv -> {
+          throw new ConnectException(cv.errorMessages().get(0));
+        });
   }
 
   @Override
@@ -177,20 +181,20 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
       }
     }));
 
-    rules.when(SCHEMA_GENERATION_ENABLED_CONF, false).
-        validate(KEY_SCHEMA_CONF, validSchema).
-        validate(VALUE_SCHEMA_CONF, validSchema);
+    rules.when(SCHEMA_GENERATION_ENABLED_CONF, false)
+        .validate(KEY_SCHEMA_CONF, validSchema)
+        .validate(VALUE_SCHEMA_CONF, validSchema);
 
-    rules.when(SCHEMA_GENERATION_ENABLED_CONF, true).
-        validate(SCHEMA_GENERATION_KEY_NAME_CONF, nonEmptyString).
-        validate(SCHEMA_GENERATION_VALUE_NAME_CONF, nonEmptyString);
+    rules.when(SCHEMA_GENERATION_ENABLED_CONF, true)
+        .validate(SCHEMA_GENERATION_KEY_NAME_CONF, nonEmptyString)
+        .validate(SCHEMA_GENERATION_VALUE_NAME_CONF, nonEmptyString);
 
-    rules.when(TIMESTAMP_MODE_CONF, SpoolDirSourceConnectorConfig.TimestampMode.FIELD.toString()).
-        validate(TIMESTAMP_FIELD_CONF, new ConfigValidationRules.Rule<>(String.class,
+    rules.when(TIMESTAMP_MODE_CONF, SpoolDirSourceConnectorConfig.TimestampMode.FIELD.toString())
+        .validate(TIMESTAMP_FIELD_CONF, new ConfigValidationRules.Rule<>(String.class,
             String.format("must be present in value.schema, cannot be optional, and must be in the correct format (i.e. %s)", timestampExample()),
-            s -> rules.findValue(String.class, VALUE_SCHEMA_CONF).
-                flatMap(this::toSchema).flatMap(schema -> Optional.ofNullable(schema.field(s))).map(Field::schema).
-                map(schema -> !schema.isOptional() && Timestamp.LOGICAL_NAME.equals(schema.name())).orElse(false)
+            s -> rules.findValue(String.class, VALUE_SCHEMA_CONF)
+                .flatMap(this::toSchema).flatMap(schema -> Optional.ofNullable(schema.field(s))).map(Field::schema)
+                .map(schema -> !schema.isOptional() && Timestamp.LOGICAL_NAME.equals(schema.name())).orElse(false)
         ));
 
     return rules.getConfig();
