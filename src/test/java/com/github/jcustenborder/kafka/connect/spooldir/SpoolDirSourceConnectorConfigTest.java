@@ -90,7 +90,7 @@ public abstract class SpoolDirSourceConnectorConfigTest {
   }
 
   @Test
-  public void timeStampTest() {
+  public void timeStamp() {
     SpoolDirSourceConnector connector = createConnector();
     settings.put(TIMESTAMP_MODE_CONF, SpoolDirSourceConnectorConfig.TimestampMode.FIELD.toString());
     Config config = connector.validate(settings);
@@ -98,10 +98,8 @@ public abstract class SpoolDirSourceConnectorConfigTest {
         filter(configValue -> !configValue.errorMessages().isEmpty()).
         map(ConfigValue::name).
         collect(Collectors.toSet());
-    Set<String> expectedConfigValuesWithErrors = Collections.emptySet();
+    Set<String> expectedConfigValuesWithErrors = Collections.singleton("timestamp.field");
     assertEquals(expectedConfigValuesWithErrors, configValuesWithErrors);
-    //Settings was validated -> possible to create connector based on settings.
-    connector.config(settings);
   }
 
   protected abstract SpoolDirSourceConnector createConnector();
