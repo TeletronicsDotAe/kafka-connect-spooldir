@@ -66,7 +66,7 @@ class ConfigValidationRules {
       config.configValues().add(cv);
       return cv;
     });
-    configValue.addErrorMessage(message);
+    configValue.addErrorMessage(String.format("Config \"%s\" %s", name, message));
   }
 
   Config getConfig() {
@@ -89,7 +89,7 @@ class ConfigValidationRules {
     private String description;
 
     When(String name, Rule<S> rule) {
-      this.description = match(name, rule) ? String.format(" when %s %s", name, rule.description) : "";
+      this.description = match(name, rule) ? String.format(" when \"%s\" %s", name, rule.description) : "";
     }
 
     <T> When<S> validate(String name, Rule<T> rule) {
