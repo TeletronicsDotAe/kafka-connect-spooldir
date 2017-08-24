@@ -25,6 +25,7 @@ import com.google.common.io.PatternFilenameFilter;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Type;
+import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.DataException;
@@ -218,9 +219,9 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
   public static ConfigDef config() {
     return new ConfigDef()
         //PollingDirectoryMonitorConfig
-        .define(INPUT_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritable.of(), ConfigDef.Importance.HIGH, INPUT_PATH_DOC)
-        .define(FINISHED_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritable.of(), ConfigDef.Importance.HIGH, FINISHED_PATH_DOC)
-        .define(ERROR_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritable.of(), ConfigDef.Importance.HIGH, ERROR_PATH_DOC)
+        .define(INPUT_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritableGuard.of(), ConfigDef.Importance.HIGH, INPUT_PATH_DOC)
+        .define(FINISHED_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritableGuard.of(), ConfigDef.Importance.HIGH, FINISHED_PATH_DOC)
+        .define(ERROR_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritableGuard.of(), ConfigDef.Importance.HIGH, ERROR_PATH_DOC)
         .define(INPUT_FILE_PATTERN_CONF, ConfigDef.Type.STRING, ConfigDef.Importance.HIGH, INPUT_FILE_PATTERN_DOC)
         .define(HALT_ON_ERROR_CONF, ConfigDef.Type.BOOLEAN, true, ConfigDef.Importance.HIGH, HALT_ON_ERROR_DOC)
         .define(FILE_MINIMUM_AGE_MS_CONF, ConfigDef.Type.LONG, 0L, ConfigDef.Range.between(0L, Long.MAX_VALUE), ConfigDef.Importance.LOW, FILE_MINIMUM_AGE_MS_DOC)
@@ -264,5 +265,26 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     FIELD,
     FILE_TIME,
     PROCESS_TIME
+  }
+
+  public static class ValidDirectoryWritableGuard implements ConfigDef.Validator {
+    private ValidDirectoryWritable validator;
+
+    public ValidDirectoryWritableGuard(ValidDirectoryWritable validator) {
+      this.validator = validator;
+    }
+
+    public static ValidDirectoryWritableGuard of() {
+      return new ValidDirectoryWritableGuard(ValidDirectoryWritable.of());
+    }
+
+    @Override
+    public void ensureValid(String name, Object value) {
+      try {
+        validator.ensureValid(name, value);
+      } catch (IllegalStateException e) {
+        throw new ConfigException(e.getMessage());
+      }
+    }
   }
 }
