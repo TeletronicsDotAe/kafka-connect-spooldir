@@ -20,13 +20,11 @@ import com.github.jcustenborder.kafka.connect.utils.config.ValidEnum;
 import com.github.jcustenborder.kafka.connect.utils.config.ValidPattern;
 import com.github.jcustenborder.kafka.connect.utils.config.validators.filesystem.ValidDirectoryWritable;
 import com.github.jcustenborder.kafka.connect.utils.jackson.ObjectMapperFactory;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.io.PatternFilenameFilter;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Type;
-import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.DataException;
@@ -167,34 +165,6 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     this.keySchema = readSchema(KEY_SCHEMA_CONF);
     this.valueSchema = readSchema(VALUE_SCHEMA_CONF);
 
-    if (!this.schemaGenerationEnabled) {
-      Preconditions.checkNotNull(
-          this.keySchema,
-          "'%s' must be set if '%s' = true.",
-          KEY_SCHEMA_CONF,
-          SCHEMA_GENERATION_ENABLED_CONF
-      );
-      Preconditions.checkNotNull(
-          this.valueSchema,
-          "'%s' must be set if '%s' = true.",
-          VALUE_SCHEMA_CONF,
-          SCHEMA_GENERATION_ENABLED_CONF
-      );
-    } else {
-      Preconditions.checkState(
-          !Strings.isNullOrEmpty(this.schemaGenerationKeyName),
-          "'%s' must be set if '%s' = true.",
-          SCHEMA_GENERATION_KEY_NAME_CONF,
-          SCHEMA_GENERATION_ENABLED_CONF
-      );
-      Preconditions.checkState(
-          !Strings.isNullOrEmpty(this.schemaGenerationValueName),
-          "'%s' must be set if '%s' = true.",
-          SCHEMA_GENERATION_VALUE_NAME_CONF,
-          SCHEMA_GENERATION_ENABLED_CONF
-      );
-    }
-
     if (null != this.keySchema) {
       this.keyMetadataField = findMetadataField(this.keySchema);
       this.hasKeyMetadataField = null != this.keyMetadataField;
@@ -216,42 +186,7 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     if (TimestampMode.FIELD == this.timestampMode) {
       this.timestampField = this.getString(TIMESTAMP_FIELD_CONF);
 
-      if (Strings.isNullOrEmpty(this.timestampField)) {
-        throw new ConnectException(
-            String.format(
-                "When `%s` is set to `%s`, `%s` must be set to a timestamp field. Cannot be null or empty.",
-                TIMESTAMP_MODE_CONF,
-                TimestampMode.FIELD,
-                TIMESTAMP_FIELD_CONF
-            )
-        );
-      }
-
       log.trace("ctor() - Looking for timestamp field '{}'", this.timestampField);
-      Field timestampField = this.valueSchema.field(this.timestampField);
-
-      if (null == timestampField ||
-          timestampField.schema().isOptional() ||
-          !Timestamp.LOGICAL_NAME.equals(timestampField.schema().name())) {
-
-        String example;
-
-        try {
-          example = ObjectMapperFactory.INSTANCE.writeValueAsString(Timestamp.SCHEMA);
-        } catch (JsonProcessingException e) {
-          example = null;
-        }
-
-        log.trace("ctor() - example: {}", example);
-
-        throw new ConnectException(
-            String.format(
-                "Field '%s' must be present and set to a timestamp and cannot be optional. Example %s",
-                this.timestampField,
-                example
-            )
-        );
-      }
     } else {
       this.timestampField = null;
     }
@@ -329,64 +264,5 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     FIELD,
     FILE_TIME,
     PROCESS_TIME
-  }
-
-  static class WritableDirectoryValidator implements ConfigDef.Validator {
-    public static WritableDirectoryValidator of() {
-      return new WritableDirectoryValidator();
-    }
-
-    @Override
-    public void ensureValid(final String key, Object value) {
-      String valueString = (String) value;
-      File directoryPath = new File(valueString);
-
-      log.info("Checking if directory {} '{}' exists.",
-          key,
-          directoryPath
-      );
-
-
-      String errorMessage = String.format(
-          "Directory for '%s' '%s' does not exist ",
-          key,
-          directoryPath
-      );
-
-      if (!directoryPath.isDirectory()) {
-        throw new ConnectException(
-            errorMessage,
-            new FileNotFoundException(directoryPath.getAbsolutePath())
-        );
-      }
-
-      log.info("Checking to ensure {} '{}' is writable ", key, directoryPath);
-
-
-      errorMessage = String.format(
-          "Directory for '%s' '%s' it not writable.",
-          key,
-          directoryPath
-      );
-
-      File temporaryFile = null;
-
-      try {
-        temporaryFile = File.createTempFile(".permission", ".testing", directoryPath);
-      } catch (IOException ex) {
-        throw new ConnectException(
-            errorMessage,
-            ex
-        );
-      } finally {
-        try {
-          if (null != temporaryFile && temporaryFile.exists()) {
-            Preconditions.checkState(temporaryFile.delete(), "Unable to delete temp file in %s", directoryPath);
-          }
-        } catch (Exception ex) {
-          log.warn("Exception thrown while deleting {}.", temporaryFile, ex);
-        }
-      }
-    }
   }
 }
