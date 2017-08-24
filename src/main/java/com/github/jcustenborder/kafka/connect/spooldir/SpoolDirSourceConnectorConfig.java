@@ -18,6 +18,7 @@ package com.github.jcustenborder.kafka.connect.spooldir;
 import com.github.jcustenborder.kafka.connect.utils.config.ConfigUtils;
 import com.github.jcustenborder.kafka.connect.utils.config.ValidEnum;
 import com.github.jcustenborder.kafka.connect.utils.config.ValidPattern;
+import com.github.jcustenborder.kafka.connect.utils.config.validators.filesystem.ValidDirectoryWritable;
 import com.github.jcustenborder.kafka.connect.utils.jackson.ObjectMapperFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -33,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -167,6 +167,34 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     this.keySchema = readSchema(KEY_SCHEMA_CONF);
     this.valueSchema = readSchema(VALUE_SCHEMA_CONF);
 
+    if (!this.schemaGenerationEnabled) {
+      Preconditions.checkNotNull(
+          this.keySchema,
+          "'%s' must be set if '%s' = true.",
+          KEY_SCHEMA_CONF,
+          SCHEMA_GENERATION_ENABLED_CONF
+      );
+      Preconditions.checkNotNull(
+          this.valueSchema,
+          "'%s' must be set if '%s' = true.",
+          VALUE_SCHEMA_CONF,
+          SCHEMA_GENERATION_ENABLED_CONF
+      );
+    } else {
+      Preconditions.checkState(
+          !Strings.isNullOrEmpty(this.schemaGenerationKeyName),
+          "'%s' must be set if '%s' = true.",
+          SCHEMA_GENERATION_KEY_NAME_CONF,
+          SCHEMA_GENERATION_ENABLED_CONF
+      );
+      Preconditions.checkState(
+          !Strings.isNullOrEmpty(this.schemaGenerationValueName),
+          "'%s' must be set if '%s' = true.",
+          SCHEMA_GENERATION_VALUE_NAME_CONF,
+          SCHEMA_GENERATION_ENABLED_CONF
+      );
+    }
+
     if (null != this.keySchema) {
       this.keyMetadataField = findMetadataField(this.keySchema);
       this.hasKeyMetadataField = null != this.keyMetadataField;
@@ -188,7 +216,42 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     if (TimestampMode.FIELD == this.timestampMode) {
       this.timestampField = this.getString(TIMESTAMP_FIELD_CONF);
 
+      if (Strings.isNullOrEmpty(this.timestampField)) {
+        throw new ConnectException(
+            String.format(
+                "When `%s` is set to `%s`, `%s` must be set to a timestamp field. Cannot be null or empty.",
+                TIMESTAMP_MODE_CONF,
+                TimestampMode.FIELD,
+                TIMESTAMP_FIELD_CONF
+            )
+        );
+      }
+
       log.trace("ctor() - Looking for timestamp field '{}'", this.timestampField);
+      Field timestampField = this.valueSchema.field(this.timestampField);
+
+      if (null == timestampField ||
+          timestampField.schema().isOptional() ||
+          !Timestamp.LOGICAL_NAME.equals(timestampField.schema().name())) {
+
+        String example;
+
+        try {
+          example = ObjectMapperFactory.INSTANCE.writeValueAsString(Timestamp.SCHEMA);
+        } catch (JsonProcessingException e) {
+          example = null;
+        }
+
+        log.trace("ctor() - example: {}", example);
+
+        throw new ConnectException(
+            String.format(
+                "Field '%s' must be present and set to a timestamp and cannot be optional. Example %s",
+                this.timestampField,
+                example
+            )
+        );
+      }
     } else {
       this.timestampField = null;
     }
@@ -203,8 +266,6 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
     final Pattern inputPattern = Pattern.compile(inputPatternText);
     this.inputFilenameFilter = new PatternFilenameFilter(inputPattern);
   }
-
-
 
   private static final Field findMetadataField(Schema schema) {
     Field result = null;
@@ -222,9 +283,9 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
   public static ConfigDef config() {
     return new ConfigDef()
         //PollingDirectoryMonitorConfig
-        .define(INPUT_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, WritableDirectoryValidator.of(), ConfigDef.Importance.HIGH, INPUT_PATH_DOC)
-        .define(FINISHED_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, WritableDirectoryValidator.of(), ConfigDef.Importance.HIGH, FINISHED_PATH_DOC)
-        .define(ERROR_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, WritableDirectoryValidator.of(), ConfigDef.Importance.HIGH, ERROR_PATH_DOC)
+        .define(INPUT_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritable.of(), ConfigDef.Importance.HIGH, INPUT_PATH_DOC)
+        .define(FINISHED_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritable.of(), ConfigDef.Importance.HIGH, FINISHED_PATH_DOC)
+        .define(ERROR_PATH_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ValidDirectoryWritable.of(), ConfigDef.Importance.HIGH, ERROR_PATH_DOC)
         .define(INPUT_FILE_PATTERN_CONF, ConfigDef.Type.STRING, ConfigDef.Importance.HIGH, INPUT_FILE_PATTERN_DOC)
         .define(HALT_ON_ERROR_CONF, ConfigDef.Type.BOOLEAN, true, ConfigDef.Importance.HIGH, HALT_ON_ERROR_DOC)
         .define(FILE_MINIMUM_AGE_MS_CONF, ConfigDef.Type.LONG, 0L, ConfigDef.Range.between(0L, Long.MAX_VALUE), ConfigDef.Importance.LOW, FILE_MINIMUM_AGE_MS_DOC)
@@ -277,12 +338,6 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
 
     @Override
     public void ensureValid(final String key, Object value) {
-      if (value == null) {
-        throw new ConfigException(
-                String.format("Directory '%s' needs to be defined ", key)
-        );
-      }
-
       String valueString = (String) value;
       File directoryPath = new File(valueString);
 
@@ -299,7 +354,7 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
       );
 
       if (!directoryPath.isDirectory()) {
-        throw new ConfigException(
+        throw new ConnectException(
             errorMessage,
             new FileNotFoundException(directoryPath.getAbsolutePath())
         );
@@ -319,7 +374,7 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
       try {
         temporaryFile = File.createTempFile(".permission", ".testing", directoryPath);
       } catch (IOException ex) {
-        throw new ConfigException(
+        throw new ConnectException(
             errorMessage,
             ex
         );
