@@ -20,12 +20,14 @@ import com.opencsv.CSVParser;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,10 +47,16 @@ public class SpoolDirCsvSourceTask extends SpoolDirSourceTask<SpoolDirCsvSourceC
   }
 
   @Override
-  protected void configure(InputStream inputStream, Map<String, String> metadata, final Long lastOffset) throws IOException {
+  protected SchemaGenerator<SpoolDirCsvSourceConnectorConfig> generator(Map<String, Object> settings) {
+    return new CsvSchemaGenerator(settings);
+  }
+
+  @Override
+  protected void configure(File inputFile, Map<String, String> metadata, final Long lastOffset) throws IOException {
+    super.configure(inputFile, metadata, lastOffset);
     log.trace("configure() - creating csvParser");
     this.csvParser = this.config.createCSVParserBuilder().build();
-    this.streamReader = new InputStreamReader(inputStream, this.config.charset);
+    this.streamReader = new InputStreamReader(new FileInputStream(inputFile), this.config.charset);
     CSVReaderBuilder csvReaderBuilder = this.config.createCSVReaderBuilder(this.streamReader, csvParser);
     this.csvReader = csvReaderBuilder.build();
 
@@ -106,30 +114,13 @@ public class SpoolDirCsvSourceTask extends SpoolDirSourceTask<SpoolDirCsvSourceC
       Struct valueStruct = new Struct(this.config.valueSchema);
 
       for (int i = 0; i < this.fieldNames.length; i++) {
-        String fieldName = this.fieldNames[i];
-        log.trace("process() - Processing field {}", fieldName);
-        String input = row[i];
-        log.trace("process() - input = '{}'", input);
-        Object fieldValue = null;
-
-        try {
-          Field field = this.config.valueSchema.field(fieldName);
-          if (null != field) {
-            fieldValue = this.parser.parseString(field.schema(), input);
-            log.trace("process() - output = '{}'", fieldValue);
-            valueStruct.put(field, fieldValue);
-          } else {
-            log.trace("process() - Field {} is not defined in the schema.", fieldName);
-          }
-        } catch (Exception ex) {
-          String message = String.format("Exception thrown while parsing data for '%s'. linenumber=%s", fieldName, this.recordOffset());
-          throw new DataException(message, ex);
-        }
-
-        Field keyField = this.config.keySchema.field(fieldName);
-        if (null != keyField) {
-          log.trace("process() - Setting key field '{}' to '{}'", keyField.name(), fieldValue);
-          keyStruct.put(keyField, fieldValue);
+        String fieldName = fieldNames[i];
+        String column = row[i];
+        boolean foundKey = buildStruct(keyStruct, this.config.keySchema, fieldName, column);
+        boolean foundValue = buildStruct(valueStruct, this.config.valueSchema, fieldName, column);
+        if (!(foundKey || foundValue)) {
+          String message = String.format("Could not find field '%s' in linenumber=%s", fieldName, this.recordOffset());
+          throw new DataException(message);
         }
       }
 
@@ -138,8 +129,21 @@ public class SpoolDirCsvSourceTask extends SpoolDirSourceTask<SpoolDirCsvSourceC
       }
 
       addRecord(records, keyStruct, valueStruct);
-
     }
     return records;
+  }
+
+  private boolean buildStruct(Struct struct, Schema schema, String fieldName, String column) {
+    try {
+      Field field = schema.field(fieldName);
+      if (field == null) {
+        return false;
+      }
+      struct.put(fieldName, this.parser.parseString(field.schema(), column));
+      return true;
+    } catch (Exception ex) {
+      String message = String.format("Exception thrown while parsing data for '%s'. linenumber=%s", fieldName, this.recordOffset());
+      throw new DataException(message, ex);
+    }
   }
 }

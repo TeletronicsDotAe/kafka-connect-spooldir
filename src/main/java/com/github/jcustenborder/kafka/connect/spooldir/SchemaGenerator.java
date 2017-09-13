@@ -181,13 +181,13 @@ public abstract class SchemaGenerator<CONFIG extends SpoolDirSourceConnectorConf
 
   public Map.Entry<Schema, Schema> generate(File inputFile, List<String> keyFields) throws IOException {
     log.trace("generate() - inputFile = '{}', keyFields = {}", inputFile, keyFields);
-
-    final Map<String, Schema.Type> fieldTypes;
-
-    log.info("Determining fields from {}", inputFile);
     try (InputStream inputStream = new FileInputStream(inputFile)) {
-      fieldTypes = determineFieldTypes(inputStream);
+      return generate(inputStream, keyFields);
     }
+  }
+
+  private Map.Entry<Schema, Schema> generate(InputStream inputStream, List<String> keyFields) throws IOException {
+    final Map<String, Schema.Type> fieldTypes = determineFieldTypes(inputStream);
 
     log.trace("generate() - Building key schema.");
     SchemaBuilder keySchemaBuilder = SchemaBuilder.struct()

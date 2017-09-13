@@ -31,11 +31,6 @@ public class SpoolDirCsvSourceConnector extends SpoolDirSourceConnector<SpoolDir
   }
 
   @Override
-  protected SchemaGenerator<SpoolDirCsvSourceConnectorConfig> generator(Map<String, String> settings) {
-    return new CsvSchemaGenerator(settings);
-  }
-
-  @Override
   public Class<? extends Task> taskClass() {
     return SpoolDirCsvSourceTask.class;
   }

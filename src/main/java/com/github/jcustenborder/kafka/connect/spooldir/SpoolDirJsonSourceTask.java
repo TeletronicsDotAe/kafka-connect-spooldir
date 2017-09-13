@@ -24,8 +24,8 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -43,19 +43,25 @@ public class SpoolDirJsonSourceTask extends SpoolDirSourceTask<SpoolDirJsonSourc
   }
 
   @Override
+  protected SchemaGenerator<SpoolDirJsonSourceConnectorConfig> generator(Map<String, Object> settings) {
+    return new JsonSchemaGenerator(settings);
+  }
+
+  @Override
   public void start(Map<String, String> settings) {
     super.start(settings);
     this.jsonFactory = new JsonFactory();
   }
 
   @Override
-  protected void configure(InputStream inputStream, Map<String, String> metadata, Long lastOffset) throws IOException {
+  protected void configure(File inputFile, Map<String, String> metadata, Long lastOffset) throws IOException {
+    super.configure(inputFile, metadata, lastOffset);
     if (null != jsonParser) {
       log.trace("configure() - Closing existing json parser.");
       jsonParser.close();
     }
 
-    this.jsonParser = this.jsonFactory.createParser(inputStream);
+    this.jsonParser = this.jsonFactory.createParser(inputFile);
     this.iterator = ObjectMapperFactory.INSTANCE.readValues(this.jsonParser, JsonNode.class);
     this.offset = -1;
 

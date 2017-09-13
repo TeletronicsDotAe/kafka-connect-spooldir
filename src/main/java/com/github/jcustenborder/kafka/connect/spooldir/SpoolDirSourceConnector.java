@@ -18,31 +18,21 @@ package com.github.jcustenborder.kafka.connect.spooldir;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.jcustenborder.kafka.connect.utils.VersionUtil;
 import com.github.jcustenborder.kafka.connect.utils.jackson.ObjectMapperFactory;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 import org.apache.kafka.common.config.Config;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.source.SourceConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.KEY_SCHEMA_CONF;
 import static com.github.jcustenborder.kafka.connect.spooldir.SpoolDirSourceConnectorConfig.PARSER_TIMESTAMP_DATE_FORMATS_CONF;
@@ -60,8 +50,6 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
 
   protected abstract CONF config(Map<String, String> settings);
 
-  protected abstract SchemaGenerator<CONF> generator(Map<String, String> settings);
-
   @Override
   public String version() {
     return VersionUtil.version(this.getClass());
@@ -70,73 +58,7 @@ public abstract class SpoolDirSourceConnector<CONF extends SpoolDirSourceConnect
   @Override
   public void start(final Map<String, String> input) {
     this.config = config(input);
-    final Map<String, String> settings = new LinkedHashMap<>(input);
-
-    if (null == this.config.valueSchema || null == this.config.keySchema) {
-      log.info("Key or Value schema was not defined. Running schema generator.");
-      SchemaGenerator<CONF> generator = generator(settings);
-
-      try {
-        List<File> inputFiles = Arrays.stream(this.config.inputPath.listFiles(this.config.inputFilenameFilter))
-            .limit(5)
-            .collect(Collectors.toList());
-        Preconditions.checkState(
-            !inputFiles.isEmpty(),
-            "Could not find any input file(s) to infer schema from."
-        );
-
-        Map<String, Map.Entry<Schema, Schema>> schemas = new HashMap<>();
-        Multimap<String, File> schemaToFiles = HashMultimap.create();
-
-        for (File inputFile : inputFiles) {
-          Map.Entry<Schema, Schema> schemaEntry = generator.generate(inputFile, this.config.keyFields);
-          String schema = ObjectMapperFactory.INSTANCE.writeValueAsString(schemaEntry.getValue());
-          schemaToFiles.put(schema, inputFile);
-          schemas.put(schema, schemaEntry);
-        }
-
-        Map<String, Collection<File>> schemaToFilesMap = schemaToFiles.asMap();
-        if (1 != schemaToFilesMap.keySet().size()) {
-          StringBuilder builder = new StringBuilder();
-          builder.append("More than one schema was found for the input pattern.\n");
-          for (String schema : schemaToFilesMap.keySet()) {
-            builder.append("Schema: ");
-            builder.append(schema);
-            builder.append("\n");
-
-            for (File f : schemaToFilesMap.get(schema)) {
-              builder.append("  ");
-              builder.append(f);
-              builder.append("\n");
-            }
-          }
-
-          throw new DataException(builder.toString());
-        }
-
-        Map.Entry<Schema, Schema> schemaPair = null;
-        for (Map.Entry<Schema, Schema> s : schemas.values()) {
-          schemaPair = s;
-          break;
-        }
-
-        if (null == schemaPair) {
-          throw new DataException("Schema could not be generated.");
-        }
-
-        final String keySchema = ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getKey());
-        log.info("Setting {} to {}", KEY_SCHEMA_CONF, keySchema);
-        final String valueSchema = ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getValue());
-        log.info("Setting {} to {}", VALUE_SCHEMA_CONF, valueSchema);
-        settings.put(KEY_SCHEMA_CONF, keySchema);
-        settings.put(VALUE_SCHEMA_CONF, valueSchema);
-      } catch (IOException e) {
-        throw new ConnectException("Exception thrown while generating schema", e);
-      }
-      this.settings = settings;
-    }
-
-    this.settings = settings;
+    this.settings = new LinkedHashMap<>(input);
   }
 
   @Override

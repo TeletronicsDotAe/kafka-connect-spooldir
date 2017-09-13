@@ -32,11 +32,6 @@ public class SpoolDirJsonSourceConnector extends SpoolDirSourceConnector<SpoolDi
   }
 
   @Override
-  protected SchemaGenerator<SpoolDirJsonSourceConnectorConfig> generator(Map<String, String> settings) {
-    return new JsonSchemaGenerator(settings);
-  }
-
-  @Override
   public Class<? extends Task> taskClass() {
     return SpoolDirJsonSourceTask.class;
   }

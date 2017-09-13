@@ -21,6 +21,7 @@ import com.github.jcustenborder.kafka.connect.utils.data.type.DateTypeParser;
 import com.github.jcustenborder.kafka.connect.utils.data.type.TimeTypeParser;
 import com.github.jcustenborder.kafka.connect.utils.data.type.TimestampTypeParser;
 import com.github.jcustenborder.kafka.connect.utils.data.type.TypeParser;
+import com.github.jcustenborder.kafka.connect.utils.jackson.ObjectMapperFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableMap;
@@ -37,10 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -54,9 +53,10 @@ public abstract class SpoolDirSourceTask<CONF extends SpoolDirSourceConnectorCon
   Stopwatch processingTime = Stopwatch.createStarted();
   private File inputFile;
   private long inputFileModifiedTime;
-  private InputStream inputStream;
   private boolean hasRecords = false;
   private Map<String, String> metadata;
+
+  protected abstract SchemaGenerator<CONF> generator(Map<String, Object> settings);
 
   private static void checkDirectory(String key, File directoryPath) {
     if (log.isInfoEnabled()) {
@@ -113,7 +113,17 @@ public abstract class SpoolDirSourceTask<CONF extends SpoolDirSourceConnectorCon
 
   protected abstract CONF config(Map<String, ?> settings);
 
-  protected abstract void configure(InputStream inputStream, Map<String, String> metadata, Long lastOffset) throws IOException;
+  protected void configure(File inputFile, Map<String, String> metadata, Long lastOffset) throws IOException {
+    if (null == this.config.valueSchema || null == this.config.keySchema) {
+      log.info("Key or Value schema was not defined. Running schema generator.");
+      SchemaGenerator<CONF> generator = generator(config.originals());
+      Map.Entry<Schema, Schema> schemaPair = generator.generate(inputFile, this.config.keyFields);
+      log.info("Setting key schema to {}", ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getKey()));
+      this.config.keySchema = schemaPair.getKey();
+      log.info("Setting value schema to {}", ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getValue()));
+      this.config.valueSchema = schemaPair.getValue();
+    }
+  }
 
   protected abstract List<SourceRecord> process() throws IOException;
 
@@ -164,31 +174,24 @@ public abstract class SpoolDirSourceTask<CONF extends SpoolDirSourceConnectorCon
     return results;
   }
 
-  private void closeAndMoveToFinished(File outputDirectory, boolean errored) throws IOException {
-    if (null != inputStream) {
-      log.info("Closing {}", this.inputFile);
+  private void moveToFinished(File outputDirectory, boolean errored) throws IOException {
+    File finishedFile = new File(outputDirectory, this.inputFile.getName());
 
-      this.inputStream.close();
-      this.inputStream = null;
+    if (errored) {
+      log.error("Error during processing, moving {} to {}.", this.inputFile, outputDirectory);
+    } else {
+      log.info("Finished processing {} in {} second(s). Moving to {}.", this.inputFile, processingTime.elapsed(TimeUnit.SECONDS), outputDirectory);
+    }
 
-      File finishedFile = new File(outputDirectory, this.inputFile.getName());
+    Files.move(this.inputFile, finishedFile);
 
-      if (errored) {
-        log.error("Error during processing, moving {} to {}.", this.inputFile, outputDirectory);
-      } else {
-        log.info("Finished processing {} in {} second(s). Moving to {}.", this.inputFile, processingTime.elapsed(TimeUnit.SECONDS), outputDirectory);
-      }
-
-      Files.move(this.inputFile, finishedFile);
-
-      File processingFile = processingFile(this.inputFile);
-      if (processingFile.exists()) {
-        log.info("Removing processing file {}", processingFile);
-        processingFile.delete();
-      }
-
+    File processingFile = processingFile(this.inputFile);
+    if (processingFile.exists()) {
+      log.info("Removing processing file {}", processingFile);
+      processingFile.delete();
     }
   }
+
 
   File processingFile(File input) {
     String fileName = input.getName() + this.config.processingFileExtension;
@@ -236,7 +239,9 @@ public abstract class SpoolDirSourceTask<CONF extends SpoolDirSourceConnectorCon
   public List<SourceRecord> read() {
     try {
       if (!hasRecords) {
-        closeAndMoveToFinished(this.config.finishedPath, false);
+        if (inputFile != null) {
+          moveToFinished(this.config.finishedPath, false);
+        }
 
         File nextFile = findNextInputFile();
         if (null == nextFile) {
@@ -261,8 +266,7 @@ public abstract class SpoolDirSourceTask<CONF extends SpoolDirSourceConnectorCon
             Number number = (Number) offset.get("offset");
             lastOffset = number.longValue();
           }
-          this.inputStream = new FileInputStream(this.inputFile);
-          configure(this.inputStream, this.metadata, lastOffset);
+          configure(this.inputFile, this.metadata, lastOffset);
         } catch (Exception ex) {
           throw new ConnectException(ex);
         }
@@ -276,7 +280,7 @@ public abstract class SpoolDirSourceTask<CONF extends SpoolDirSourceConnectorCon
       log.error("Exception encountered processing line {} of {}.", recordOffset(), this.inputFile, ex);
 
       try {
-        closeAndMoveToFinished(this.config.errorPath, true);
+        moveToFinished(this.config.errorPath, true);
       } catch (IOException ex0) {
         log.error("Exception thrown while moving {} to {}", this.inputFile, this.config.errorPath, ex0);
       }

@@ -115,8 +115,8 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
   public final long minimumFileAgeMS;
   public final int batchSize;
   public final String topic;
-  public final Schema keySchema;
-  public final Schema valueSchema;
+  public Schema keySchema;
+  public Schema valueSchema;
   public final Field keyMetadataField;
   public final Field valueMetadataField;
   public final SimpleDateFormat[] parserTimestampDateFormats;
@@ -192,11 +192,11 @@ abstract class SpoolDirSourceConnectorConfig extends AbstractConfig {
       this.timestampField = null;
     }
 
-    if (isTask && null == this.valueSchema) {
+    /*if (isTask && null == this.valueSchema) {
       throw new DataException(
           String.format("'%s' must be set to a valid schema.", VALUE_SCHEMA_CONF)
       );
-    }
+    }*/
 
     final String inputPatternText = this.getString(INPUT_FILE_PATTERN_CONF);
     final Pattern inputPattern = Pattern.compile(inputPatternText);
