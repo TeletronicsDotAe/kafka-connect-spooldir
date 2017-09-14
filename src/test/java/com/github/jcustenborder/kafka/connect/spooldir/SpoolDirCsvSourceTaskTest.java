@@ -16,6 +16,7 @@
 package com.github.jcustenborder.kafka.connect.spooldir;
 
 import com.google.common.io.Files;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTaskContext;
 import org.apache.kafka.connect.storage.OffsetStorageReader;
@@ -30,9 +31,12 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 import static com.github.jcustenborder.kafka.connect.spooldir.TestEnvironments.*;
@@ -73,7 +77,7 @@ public class SpoolDirCsvSourceTaskTest extends SpoolDirSourceTaskTest<SpoolDirCs
   }
 
   @Test
-  public void sanityTest() throws InterruptedException {
+  public void testThatAutomaticSchemaGenerationWorks() throws InterruptedException {
     Map<String, String> settings = schemaGenerationOn(csv());
     Map<String, Object> offset = new HashMap<>();
     SpoolDirCsvSourceTask task = new SpoolDirCsvSourceTask();
@@ -81,23 +85,19 @@ public class SpoolDirCsvSourceTaskTest extends SpoolDirSourceTaskTest<SpoolDirCs
     task.start(settings);
 
     setupResourceForConsumption(settings, "csv/DataHasMoreFields.data");
+
     List<SourceRecord> result = task.poll();
+    assertEquals(20, result.size());
 
-
-
-
-
-
-
-
+    result = task.poll();
+    assertTrue(result.isEmpty());
 
     task.stop();
-    assertTrue(true);
   }
 
   private void setupResourceForConsumption(Map<String, String> settings, String resourceName) throws InterruptedException {
     TestResourceLoader.loadAndPlace(resourceName,
-        Paths.get(settings.get(SpoolDirSourceConnectorConfig.INPUT_PATH_CONFIG), "input.csv"));
+        Paths.get(settings.get(SpoolDirSourceConnectorConfig.INPUT_PATH_CONFIG), UUID.randomUUID().toString() + ".csv"));
     Thread.sleep(Integer.parseInt(settings.get(SpoolDirSourceConnectorConfig.FILE_MINIMUM_AGE_MS_CONF)) * 10);
   }
 
@@ -107,5 +107,58 @@ public class SpoolDirCsvSourceTaskTest extends SpoolDirSourceTaskTest<SpoolDirCs
     when(offsetStorageReader.offset(anyMap())).thenReturn(offset);
     when(result.offsetStorageReader()).thenReturn(offsetStorageReader);
     return result;
+  }
+
+  @Test
+  public void testThatAutomaticSchemaGenerationWorksForTwoDifferentFilesInOneOrder() throws InterruptedException {
+    Map<String, String> settings = schemaGenerationOn(csv());
+    Map<String, Object> offset = new HashMap<>();
+    SpoolDirCsvSourceTask task = new SpoolDirCsvSourceTask();
+    task.initialize(mockedContext(offset));
+    task.start(settings);
+
+    setupResourceForConsumption(settings, "csv/DataHasMoreFields.data");
+
+    List<SourceRecord> result = task.poll();
+    assertEquals(20, result.size());
+
+    setupResourceForConsumption(settings, "csv/FieldsMatch.data");
+
+    result = task.poll();
+    assertTrue(result.isEmpty());
+
+    result = task.poll();
+    assertEquals(20, result.size());
+
+    result = task.poll();
+    assertTrue(result.isEmpty());
+
+    result = task.poll();
+    assertTrue(result.isEmpty());
+
+    task.stop();
+  }
+
+  @Test()
+  public void testThatAutomaticSchemaGenerationDoesNotWorkForTwoDifferentFilesInAnotherOrder() throws InterruptedException {
+    Map<String, String> settings = schemaGenerationOn(csv());
+    Map<String, Object> offset = new HashMap<>();
+    SpoolDirCsvSourceTask task = new SpoolDirCsvSourceTask();
+    task.initialize(mockedContext(offset));
+    task.start(settings);
+
+    setupResourceForConsumption(settings, "csv/FieldsMatch.data");
+
+    List<SourceRecord> result = task.poll();
+    assertEquals(20, result.size());
+
+    setupResourceForConsumption(settings, "csv/DataHasMoreFields.data");
+
+    result = task.poll();
+    assertTrue(result.isEmpty());
+
+    assertThrows(ConnectException.class, task::poll);
+
+    task.stop();
   }
 }
