@@ -239,7 +239,7 @@ public abstract class SpoolDirSourceTask<CONF extends SpoolDirSourceConnectorCon
   public List<SourceRecord> read() {
     try {
       if (!hasRecords) {
-        if (inputFile != null) {
+        if (inputFile != null && inputFile.exists()) {
           moveToFinished(this.config.finishedPath, false);
         }
 

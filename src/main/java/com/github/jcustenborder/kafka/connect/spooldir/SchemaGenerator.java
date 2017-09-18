@@ -190,8 +190,7 @@ public abstract class SchemaGenerator<CONFIG extends SpoolDirSourceConnectorConf
     final Map<String, Schema.Type> fieldTypes = determineFieldTypes(inputStream);
 
     log.trace("generate() - Building key schema.");
-    SchemaBuilder keySchemaBuilder = SchemaBuilder.struct()
-        .name("com.github.jcustenborder.kafka.connect.model.Key");
+    SchemaBuilder keySchemaBuilder = SchemaBuilder.struct().name(config.schemaGenerationKeyName);
 
     for (String keyFieldName : keyFields) {
       log.trace("generate() - Adding keyFieldName field '{}'", keyFieldName);
@@ -204,8 +203,7 @@ public abstract class SchemaGenerator<CONFIG extends SpoolDirSourceConnectorConf
     }
 
     log.trace("generate() - Building value schema.");
-    SchemaBuilder valueSchemaBuilder = SchemaBuilder.struct()
-        .name("com.github.jcustenborder.kafka.connect.model.Value");
+    SchemaBuilder valueSchemaBuilder = SchemaBuilder.struct().name(config.schemaGenerationValueName);
 
     for (Map.Entry<String, Schema.Type> kvp : fieldTypes.entrySet()) {
       addField(valueSchemaBuilder, kvp.getKey(), kvp.getValue());
