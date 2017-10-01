@@ -90,7 +90,7 @@ public class SpoolDirJsonSourceTask extends SpoolDirSourceTask<SpoolDirJsonSourc
       JsonNode node = next();
 
       Struct valueStruct = new Struct(this.config.valueSchema);
-      Struct keyStruct = new Struct(this.config.keySchema);
+      Struct keyStruct = this.config.keySchema == null ? null : new Struct(this.config.keySchema);
       log.trace("process() - input = {}", node);
       for (Field field : this.config.valueSchema.fields()) {
         JsonNode fieldNode = node.get(field.name());
@@ -101,7 +101,7 @@ public class SpoolDirJsonSourceTask extends SpoolDirSourceTask<SpoolDirJsonSourc
           log.trace("process() - field: {} output = '{}'", field.name(), fieldValue);
           valueStruct.put(field, fieldValue);
 
-          Field keyField = this.config.keySchema.field(field.name());
+          Field keyField = this.config.keySchema == null ? null : this.config.keySchema.field(field.name());
           if (null != keyField) {
             log.trace("process() - Setting key field '{}' to '{}'", keyField.name(), fieldValue);
             keyStruct.put(keyField, fieldValue);
