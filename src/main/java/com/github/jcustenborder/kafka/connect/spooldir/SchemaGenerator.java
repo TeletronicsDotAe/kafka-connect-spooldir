@@ -189,17 +189,22 @@ public abstract class SchemaGenerator<CONFIG extends SpoolDirSourceConnectorConf
   private Map.Entry<Schema, Schema> generate(InputStream inputStream, List<String> keyFields) throws IOException {
     final Map<String, Schema.Type> fieldTypes = determineFieldTypes(inputStream);
 
-    log.trace("generate() - Building key schema.");
-    SchemaBuilder keySchemaBuilder = SchemaBuilder.struct().name(config.schemaGenerationKeyName);
-
-    for (String keyFieldName : keyFields) {
-      log.trace("generate() - Adding keyFieldName field '{}'", keyFieldName);
-      if (fieldTypes.containsKey(keyFieldName)) {
-        Schema.Type schemaType = fieldTypes.get(keyFieldName);
-        addField(keySchemaBuilder, keyFieldName, schemaType);
-      } else {
-        log.warn("Key field '{}' is not in the data.", keyFieldName);
+    Schema keySchema = null;
+    if (keyFields.isEmpty()) {
+      log.trace("generate() - Not building key schema. no key fields supplied");
+    } else {
+      log.trace("generate() - Building key schema.");
+      SchemaBuilder keySchemaBuilder = SchemaBuilder.struct().name(config.schemaGenerationKeyName);
+      for (String keyFieldName : keyFields) {
+        log.trace("generate() - Adding keyFieldName field '{}'", keyFieldName);
+        if (fieldTypes.containsKey(keyFieldName)) {
+          Schema.Type schemaType = fieldTypes.get(keyFieldName);
+          addField(keySchemaBuilder, keyFieldName, schemaType);
+        } else {
+          log.warn("Key field '{}' is not in the data.", keyFieldName);
+        }
       }
+      keySchema = keySchemaBuilder.build();
     }
 
     log.trace("generate() - Building value schema.");
@@ -208,8 +213,9 @@ public abstract class SchemaGenerator<CONFIG extends SpoolDirSourceConnectorConf
     for (Map.Entry<String, Schema.Type> kvp : fieldTypes.entrySet()) {
       addField(valueSchemaBuilder, kvp.getKey(), kvp.getValue());
     }
+    Schema valueSchema = valueSchemaBuilder.build();
 
-    return new AbstractMap.SimpleEntry<>(keySchemaBuilder.build(), valueSchemaBuilder.build());
+    return new AbstractMap.SimpleEntry<>(keySchema, valueSchema);
   }
 
 }

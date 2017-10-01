@@ -111,7 +111,7 @@ public class SpoolDirCsvSourceTask extends SpoolDirSourceTask<SpoolDirCsvSourceC
       }
       log.trace("process() - Row on line {} has {} field(s)", recordOffset(), row.length);
 
-      Struct keyStruct = new Struct(this.config.keySchema);
+      Struct keyStruct = this.config.keySchema == null ? null : new Struct(this.config.keySchema);
       Struct valueStruct = new Struct(this.config.valueSchema);
 
       for (int i = 0; i < this.fieldNames.length; i++) {
@@ -136,6 +136,9 @@ public class SpoolDirCsvSourceTask extends SpoolDirSourceTask<SpoolDirCsvSourceC
 
   private boolean buildStruct(Struct struct, Schema schema, String fieldName, String column) {
     try {
+      if (struct == null) {
+        return false;
+      }
       Field field = schema.field(fieldName);
       if (field == null) {
         return false;

@@ -114,11 +114,11 @@ public abstract class SpoolDirSourceTask<CONF extends SpoolDirSourceConnectorCon
   protected abstract CONF config(Map<String, ?> settings);
 
   protected void configure(File inputFile, Map<String, String> metadata, Long lastOffset) throws IOException {
-    if (null == this.config.valueSchema || null == this.config.keySchema) {
+    if (null == this.config.valueSchema && null == this.config.keySchema && this.config.schemaGenerationEnabled) {
       log.info("Key or Value schema was not defined. Running schema generator.");
       SchemaGenerator<CONF> generator = generator(config.originals());
       Map.Entry<Schema, Schema> schemaPair = generator.generate(inputFile, this.config.keyFields);
-      log.info("Setting key schema to {}", ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getKey()));
+      log.info("Setting key schema to {}", schemaPair.getKey() == null ? null : ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getKey()));
       this.config.keySchema = schemaPair.getKey();
       log.info("Setting value schema to {}", ObjectMapperFactory.INSTANCE.writeValueAsString(schemaPair.getValue()));
       this.config.valueSchema = schemaPair.getValue();
