@@ -30,6 +30,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -64,7 +65,8 @@ public class SpoolDirCsvSourceTask extends SpoolDirSourceTask<SpoolDirCsvSourceC
 
     if (this.config.firstRowAsHeader) {
       log.trace("configure() - Reading the header row.");
-      fieldNames = this.csvReader.readNext();
+      fieldNames = Arrays.stream(this.csvReader.readNext())
+          .map(HeaderTranslator::toValidSchemaKey).toArray(String[]::new);
       log.info("configure() - field names from header row. fields = {}", Joiner.on(", ").join(fieldNames));
     } else {
       log.trace("configure() - Using fields from schema {}", this.config.valueSchema.name());

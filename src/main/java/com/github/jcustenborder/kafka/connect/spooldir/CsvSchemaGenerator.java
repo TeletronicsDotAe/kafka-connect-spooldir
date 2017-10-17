@@ -24,8 +24,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.ConnectException;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class CsvSchemaGenerator extends SchemaGenerator<SpoolDirCsvSourceConnectorConfig> {
   private static final Logger log = LoggerFactory.getLogger(CsvSchemaGenerator.class);
@@ -60,13 +64,22 @@ public class CsvSchemaGenerator extends SchemaGenerator<SpoolDirCsvSourceConnect
           }
         }
 
-        for (String s : headers) {
+        List<String> keys = Arrays.stream(headers).map(HeaderTranslator::toValidSchemaKey).collect(Collectors.toList());
+        if (keys.stream().anyMatch(String::isEmpty) && keys.stream().distinct().count() != keys.size()) {
+          throw new ConnectException(
+              String.format("Could not translate headers into valid key names (headers: %s)",
+                  Arrays.stream(headers).collect(Collectors.joining(",")))
+          );
+        }
+        for (String s : keys) {
           typeMap.put(s, Schema.Type.STRING);
         }
       }
     }
     return typeMap;
   }
+
+
 
 
 }
